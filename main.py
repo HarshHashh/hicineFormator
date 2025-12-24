@@ -177,25 +177,28 @@ def format_series(data):
 
 # ---------- API ROUTES ----------
 
-@app.get("/movies/{movie_id}")
-def get_movie(movie_id: str):
-    url = f"https://api.hicine.info/api/movies/{movie_id}"
+
+@app.get("/type/{type}/{_id}")
+def get_by_type(type: str, _id: str):
+    url = f"https://api.hicine.info/api/{type}/{_id}"
 
     try:
         res = requests.get(url, timeout=15)
         res.raise_for_status()
-        return format_movie(res.json())
-    except Exception as e:
+        data = res.json()
+
+        if "movie" in type.lower():
+            return format_movie(data)
+
+        if "series" in type.lower():
+            return format_series(data)
+
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid type. Use 'movies' or 'series'."
+        )
+
+    except requests.RequestException as e:
         raise HTTPException(status_code=502, detail=str(e))
 
 
-@app.get("/series/{series_id}")
-def get_series(series_id: str):
-    url = f"https://api.hicine.info/api/series/{series_id}"
-
-    try:
-        res = requests.get(url, timeout=15)
-        res.raise_for_status()
-        return format_series(res.json())
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
