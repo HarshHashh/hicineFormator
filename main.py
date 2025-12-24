@@ -116,10 +116,10 @@ def extract_all_seasons(data):
 
 def format_movie(data):
     return {
-        "id": data["_id"],
+        "_id": data["_id"],
         "record_id": data["record_id"],
         "title": data["title"],
-        "slug": data["url_slug"],
+        "url_slug": data["url_slug"],
         "featured_image": data.get("featured_image"),
         "poster": data.get("poster"),
         "categories": data.get("categories"),
@@ -133,10 +133,10 @@ def format_movie(data):
 
 def format_series(data):
     return {
-        "id": data["_id"],
+        "_id": data["_id"],
         "record_id": data["record_id"],
         "title": data["title"],
-        "slug": data["url_slug"],
+        "url_slug": data["url_slug"],
         "featured_image": data.get("featured_image"),
         "poster": data.get("poster"),
         "categories": data.get("categories"),
