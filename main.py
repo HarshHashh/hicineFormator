@@ -6,6 +6,14 @@ from datetime import datetime
 app = FastAPI(title="Hicine Normalizer API")
 
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # allow all origins (safe for public API)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # ---------- SIZE NORMALIZATION ----------
 
 def normalize_size(size, quality):
