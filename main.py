@@ -150,7 +150,7 @@ def format_series(data):
 
 # ---------- API ROUTES ----------
 
-@app.get("/movie/{movie_id}")
+@app.get("/movies/{movie_id}")
 def get_movie(movie_id: str):
     url = f"https://api.hicine.info/api/movies/{movie_id}"
 
