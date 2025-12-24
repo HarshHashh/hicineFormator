@@ -72,24 +72,42 @@ def parse_movie_links(links_text):
 
 def parse_season(season_text):
     episodes = {}
-    parts = re.split(r"Episode\s+(\d+)\s*:", season_text)
+
+    # Split strictly on Episode X :
+    parts = re.split(r"\bEpisode\s+(\d+)\s*:\s*", season_text)
 
     for i in range(1, len(parts), 2):
         ep_number = int(parts[i])
         ep_block = parts[i + 1]
 
         streams = []
-        matches = re.findall(
+
+        # Match patterns like:
+        # 480p : URL, 208.27 MB
+        # URL, 208.27 MB,480p
+        pattern = re.compile(
             r"(480p|720p|1080p|2160p)\s*:\s*(https://[^\s,]+)"
             r"|"
-            r"(https://[^\s,]+)\s*,\s*([\d.]+\s*MB)",
-            ep_block
+            r"(https://[^\s,]+)\s*,\s*([\d.]+\s*(MB|GB))\s*,?\s*(480p|720p|1080p|2160p)",
+            re.I
         )
 
-        for m in matches:
-            quality = m[0] if m[0] else "unknown"
-            url = m[1] if m[1] else m[2]
-            raw_size = m[3] if len(m) > 3 else None
+        for match in pattern.finditer(ep_block):
+            if match.group(1):
+                # format: 720p : URL
+                quality = match.group(1)
+                url = match.group(2)
+                raw_size = None
+            else:
+                # format: URL, size, quality
+                url = match.group(3)
+                raw_size = match.group(4)
+                quality = match.group(6)
+
+            # skip broken links (vcloud=)
+            if not url or url.endswith("vcloud="):
+                continue
+
             size = normalize_size(raw_size, quality)
 
             streams.append({
