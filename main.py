@@ -190,8 +190,9 @@ def get_by_type(type: str, _id: str):
         if "movie" in type.lower():
             return format_movie(data)
 
-        if "series" in type.lower():
-            return format_series(data)
+      if "series" in type.lower() or "anime" in type.lower():
+        return format_series(data)
+
 
         raise HTTPException(
             status_code=400,
