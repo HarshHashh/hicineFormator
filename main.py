@@ -15,6 +15,52 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+
+def zip_size(text):
+    if not text:
+        return None
+    return text.replace(" ", "").upper()
+
+def seasons_zip(raw_text: str):
+    seasons = {}
+
+    # Split by Season X :
+    parts = re.split(r"\bSeason\s+(\d+)\s*:\s*", raw_text)
+
+    for i in range(1, len(parts), 2):
+        season_number = int(parts[i])
+        block = parts[i + 1]
+
+        streams = []
+
+        # Find every URL and some text after it
+        url_pattern = re.compile(
+            r"(https://[^\s,]+)\s*,?\s*([^:\n]+)",
+            re.I
+        )
+
+        for match in url_pattern.finditer(block):
+            url = match.group(1)
+            tail = match.group(2)
+
+            # quality
+            q_match = re.search(r"(480p|720p|1080p|2160p)", tail, re.I)
+            quality = q_match.group(1) if q_match else None
+
+            
+            streams.append({
+                "quality": quality,
+                "url": url
+            })
+
+        seasons[f"season_{season_number}"] = streams
+
+    return seasons
+
+
+
+
 # ---------- SIZE NORMALIZATION ----------
 
 def normalize_size(size, quality):
@@ -36,79 +82,83 @@ def normalize_size(size, quality):
 
 def parse_movie_links(links_text):
     streams = []
+    data = []
     if not links_text:
         return streams
+    link = [links_text.split(",")]
+    
+    for i in link[0]:
+        if 'Link' not in i and len(i) > 10:
+            if '\n' in i:
+                streams.append(i.split("\n")[1])
+            else:
+                streams.append(i)
 
-    lines = [l.strip() for l in links_text.split("\n") if l.strip()]
-
-    for line in lines:
-        url_match = re.search(r"https://[^\s,]+", line)
-        if not url_match:
-            continue
-
-        url = url_match.group()
-
-        quality_match = re.search(r"(480p|720p|1080p|2160p|4K)", line, re.I)
-        quality = quality_match.group(1) if quality_match else "unknown"
-
-        size_match = re.search(r"([\d.]+\s*(MB|GB))", line, re.I)
-        raw_size = size_match.group(1) if size_match else None
-        size = normalize_size(raw_size, quality)
-
-        source_match = re.search(r"(BluRay|WEB[- ]DL|HDRip|DVDRip)", line, re.I)
-        source = source_match.group(1) if source_match else None
-
-        streams.append({
-            "quality": quality,
-            "size": size,
-            "source": source,
-            "url": url
+  
+    for i in range(0,len(streams), 2):
+        if len(streams) == i:
+            break
+        url = streams[i]
+        title = streams[i+1]
+        data.append({
+            'title' : title,
+            'url' : url
         })
+        
+        
+    return data
+   
 
-    return streams
 
+# Season parse
+def normalize_size(raw_size):
+    if not raw_size:
+        return None
+    return raw_size.replace(" ", "")
 
-# ---------- SERIES PARSER ----------
+def format_season(raw_text: str):
+    result = {
+        "title": "",
+        "episodes": []
+    }
 
-def parse_season(season_text):
-    episodes = {}
+    # ---------- 1. Split title ----------
+    title_match = re.split(r"\bEpisode\s+1\s*:\s*", raw_text, maxsplit=1)
+    result["title"] = title_match[0].strip()
 
-    # Split strictly on Episode X :
-    parts = re.split(r"\bEpisode\s+(\d+)\s*:\s*", season_text)
+    episode_text = "Episode 1 : " + title_match[1]
 
-    for i in range(1, len(parts), 2):
-        ep_number = int(parts[i])
-        ep_block = parts[i + 1]
+    # ---------- 2. Split episodes ----------
+    episode_parts = re.split(r"\bEpisode\s+(\d+)\s*:\s*", episode_text)
+
+    for i in range(1, len(episode_parts), 2):
+        ep_number = int(episode_parts[i])
+        ep_block = episode_parts[i + 1]
 
         streams = []
 
-        # Match patterns like:
-        # 480p : URL, 208.27 MB
-        # URL, 208.27 MB,480p
-        pattern = re.compile(
-            r"(480p|720p|1080p|2160p)\s*:\s*(https://[^\s,]+)"
-            r"|"
-            r"(https://[^\s,]+)\s*,\s*([\d.]+\s*(MB|GB))\s*,?\s*(480p|720p|1080p|2160p)",
-            re.I
+        # ---------- 3. Unified stream regex ----------
+        stream_pattern = re.compile(
+            r"""
+            (?:
+                (?P<q1>480p|720p|1080p|2160p)\s*:\s*
+                (?P<u1>https://[^\s,]+)
+                (?:\s*,\s*(?P<s1>[\d.]+\s*(?:MB|GB)))?
+            )
+            |
+            (?:
+                (?P<u2>https://[^\s,]+)
+                \s*,\s*(?P<s2>[\d.]+\s*(?:MB|GB))
+                \s*,\s*(?P<q2>480p|720p|1080p|2160p)
+            )
+            """,
+            re.I | re.VERBOSE
         )
 
-        for match in pattern.finditer(ep_block):
-            if match.group(1):
-                # format: 720p : URL
-                quality = match.group(1)
-                url = match.group(2)
-                raw_size = None
-            else:
-                # format: URL, size, quality
-                url = match.group(3)
-                raw_size = match.group(4)
-                quality = match.group(6)
-
-            # skip broken links (vcloud=)
-            if not url or url.endswith("vcloud="):
-                continue
-
-            size = normalize_size(raw_size, quality)
+        for m in stream_pattern.finditer(ep_block):
+            quality = m.group("q1") or m.group("q2")
+            url = m.group("u1") or m.group("u2")
+            size = normalize_size(m.group("s1") or m.group("s2"))
 
             streams.append({
                 "quality": quality,
@@ -116,12 +166,13 @@ def parse_season(season_text):
                 "url": url
             })
 
-        episodes[f"episode_{ep_number}"] = {
+        result["episodes"].append({
             "episode": ep_number,
             "streams": streams
-        }
+        })
 
-    return episodes
+    return result
+
 
 
 def extract_all_seasons(data):
@@ -133,7 +184,7 @@ def extract_all_seasons(data):
         if key not in data or data[key] is None:
             break
 
-        seasons[key] = parse_season(data[key])
+        seasons[key] = format_season    (data[key])
         idx += 1
 
     return seasons
@@ -169,6 +220,7 @@ def format_series(data):
         "categories": data.get("categories"),
         "status": data["status"],
         "seasons": extract_all_seasons(data),
+        "zip": seasons_zip(data["season_zip"]),
         "created_at": data["date"],
         "updated_at": data["modified_date"],
         "generated_at": datetime.utcnow().isoformat()
@@ -176,6 +228,24 @@ def format_series(data):
 
 
 # ---------- API ROUTES ----------
+@app.get("/hehe/{type}/{_id}")
+def gett(type: str, _id: str):
+    url = f"https://api.hicine.info/api/{type}/{_id}"
+
+    try:
+        res = requests.get(url, timeout=15)
+        res.raise_for_status()
+        data = res.json()
+
+        if "movie" in type.lower():
+            return data
+
+        if "series" in type.lower() or "anime" in type.lower():
+            return data
+    
+    except requests.RequestException as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
 
 
 @app.get("/type/{type}/{_id}")
