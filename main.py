@@ -116,9 +116,10 @@ def normalize_size(raw_size):
         return None
     return raw_size.replace(" ", "")
 
-def format_season(raw_text: str):
+def format_season(raw_text: str , zip):
     result = {
         "title": "",
+        'zip' : zip,
         "episodes": []
     }
 
@@ -179,19 +180,22 @@ def extract_all_seasons(data):
     seasons = {}
     idx = 1
 
+    zip = seasons_zip(data["season_zip"])
+    
     while True:
         key = f"season_{idx}"
+        
         if key not in data or data[key] is None:
             break
 
-        seasons[key] = format_season    (data[key])
+        seasons[key] = format_season(data[key] , zip[key])
         idx += 1
 
     return seasons
 
 
 # ---------- FORMATTERS ----------
-
+ 
 def format_movie(data):
     return {
         "_id": data["_id"],
@@ -220,7 +224,7 @@ def format_series(data):
         "categories": data.get("categories"),
         "status": data["status"],
         "seasons": extract_all_seasons(data),
-        "zip": seasons_zip(data["season_zip"]),
+        # "zip": seasons_zip(data["season_zip"]),
         "created_at": data["date"],
         "updated_at": data["modified_date"],
         "generated_at": datetime.utcnow().isoformat()
