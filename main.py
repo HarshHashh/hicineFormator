@@ -167,27 +167,32 @@ def ep_link_gets(raw: str):
     return episodes
 
 
-
 def extract_all_seasons(data):
     seasons = {}
-    idx = 1
 
-    zip = seasons_zip(data["season_zip"])
-    
-    while True:
-        key = f"season_{idx}"
-        
-        if key not in data or data[key] is None:
-            break
+    zip_map = {}
+    if data.get("season_zip"):
+        zip_map = seasons_zip(data["season_zip"])
+
+    for key, value in data.items():
+        # only season_N keys
+        if not re.fullmatch(r"season_\d+", key):
+            continue
+
+        # skip null seasons
+        if value is None:
+            continue
+
+        lines = value.split("\n")
 
         seasons[key] = {
-                            "title": data[key].split('\n')[0],
-                            'zip' : zip[key],
-                            "episodes": ep_link_gets(data[key].split('\n')[1::])
-                        }
-        idx += 1
+            "title": lines[0],
+            "zip": zip_map.get(key),
+            "episodes": ep_link_gets(lines[1:])
+        }
 
     return seasons
+
 
 
 # ---------- FORMATTERS ----------
