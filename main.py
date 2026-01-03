@@ -116,63 +116,55 @@ def normalize_size(raw_size):
         return None
     return raw_size.replace(" ", "")
 
-def format_season(raw_text: str , zip):
-    result = {
-        "title": "",
-        'zip' : zip,
-        "episodes": []
-    }
+def extract_streams(raw: str):
+    results = []
 
-    # ---------- 1. Split title ----------
-    title_match = re.split(r"\bEpisode\s+1\s*:\s*", raw_text, maxsplit=1)
-    result["title"] = title_match[0].strip()
+    parts = raw.split(" : ")
+    count = -1
+    for part in parts:
+        count+=1
+        url, quality = part.rsplit(",", 1)
 
-    episode_text = "Episode 1 : " + title_match[1]
-
-    # ---------- 2. Split episodes ----------
-    episode_parts = re.split(r"\bEpisode\s+(\d+)\s*:\s*", episode_text)
-
-    for i in range(1, len(episode_parts), 2):
-        ep_number = int(episode_parts[i])
-        ep_block = episode_parts[i + 1]
-
-        streams = []
-
-        # ---------- 3. Unified stream regex ----------
-        stream_pattern = re.compile(
-            r"""
-            (?:
-                (?P<q1>480p|720p|1080p|2160p)\s*:\s*
-                (?P<u1>https://[^\s,]+)
-                (?:\s*,\s*(?P<s1>[\d.]+\s*(?:MB|GB)))?
-            )
-            |
-            (?:
-                (?P<u2>https://[^\s,]+)
-                \s*,\s*(?P<s2>[\d.]+\s*(?:MB|GB))
-                \s*,\s*(?P<q2>480p|720p|1080p|2160p)
-            )
-            """,
-            re.I | re.VERBOSE
-        )
-
-        for m in stream_pattern.finditer(ep_block):
-            quality = m.group("q1") or m.group("q2")
-            url = m.group("u1") or m.group("u2")
-            size = normalize_size(m.group("s1") or m.group("s2"))
-
-            streams.append({
-                "quality": quality,
-                "size": size,
-                "url": url
-            })
-
-        result["episodes"].append({
-            "episode": ep_number,
-            "streams": streams
+        if len(parts) == 5 and count == 1:
+            results.append({
+                                "size": "720p 10bit",  
+                                "url": url                
+                            })
+            continue
+            
+        
+        results.append({
+            "size": quality.strip(),  
+            "url": url                
         })
 
-    return result
+    return results
+
+
+
+def ep_link_gets(raw: str):
+    episodes = {}
+  
+    for ep in raw:
+        title = ep.split(":")[0]
+        data = ep.split(",")
+
+        raw_str = ''
+        for i in data:
+            if "MB" in i or "GB" in i:
+                continue
+            if i.startswith("Episode"):
+                raw_str = raw_str + i.split(": ")[1]
+                continue
+            raw_str = raw_str + "," + i
+                 
+        
+        episodes.update({
+            title: extract_streams(raw_str)
+        })
+        
+        
+    return episodes
 
 
 
@@ -188,7 +180,11 @@ def extract_all_seasons(data):
         if key not in data or data[key] is None:
             break
 
-        seasons[key] = format_season(data[key] , zip[key])
+        seasons[key] = {
+                            "title": data[key].split('\n')[0],
+                            'zip' : zip[key],
+                            "episodes": ep_link_gets(data[key].split('\n')[1::])
+                        }
         idx += 1
 
     return seasons
@@ -224,7 +220,6 @@ def format_series(data):
         "categories": data.get("categories"),
         "status": data["status"],
         "seasons": extract_all_seasons(data),
-        # "zip": seasons_zip(data["season_zip"]),
         "created_at": data["date"],
         "updated_at": data["modified_date"],
         "generated_at": datetime.utcnow().isoformat()
