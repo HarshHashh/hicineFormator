@@ -51,7 +51,7 @@ def seasons_zip(raw_text: str):
             
             streams.append({
                 "quality": quality,
-                "url": url
+                "url": url.split("=")[1]
             })
 
         seasons[f"season_{season_number}"] = streams
@@ -102,7 +102,7 @@ def parse_movie_links(links_text):
         title = streams[i+1]
         data.append({
             'title' : title,
-            'url' : url
+            'url' : str(url).split("=")[1]
         })
         
         
@@ -135,7 +135,7 @@ def extract_streams(raw: str):
         
         results.append({
             "size": quality.strip(),  
-            "url": url.split(",")[0]                
+            "url": url.split("=")[1]                
         })
 
     return results
