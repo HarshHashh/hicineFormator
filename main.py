@@ -125,19 +125,25 @@ def extract_streams(raw: str):
         count+=1
         url, quality = part.rsplit(",", 1)
 
-        if len(parts) == 5 and count == 1:
-            results.append({
-                                "size": "720p 10bit",  
-                                "url": url.split(",")[0]           
-                            })
-            continue
+        Q_url = url.split(",")[0].split("=")[1]
+        if len(Q_url) > 10:
             
+            if len(parts) == 5 and count == 1:
+                
+                results.append({
+                                    "size": "720p 10bit",  
+                                    "url":  Q_url          
+                                })
+                continue
+                
+            
+            results.append({
+                "size": quality.strip(),  
+                "url": Q_url               
+            })
+        else: 
+            continue
         
-        results.append({
-            "size": quality.strip(),  
-            "url": url.split("=")[1]                
-        })
-
     return results
 
 
